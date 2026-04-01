@@ -7,6 +7,7 @@ import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 import * as path from 'path';
+import { getAgentPolicyStatements } from './agent-permissions';
 
 interface AgentCoreStackProps extends cdk.StackProps {
     prefix: string;
@@ -30,72 +31,12 @@ export class AgentCoreStack extends cdk.Stack {
 
         // Create IAM role for AgentCore Runtime
         const runtimePolicy = new iam.PolicyDocument({
-            statements: [
-                new iam.PolicyStatement({
-                    sid: 'ECRImageAccess',
-                    effect: iam.Effect.ALLOW,
-                    actions: ['ecr:BatchGetImage', 'ecr:GetDownloadUrlForLayer'],
-                    resources: [dockerImage.repository.repositoryArn],
-                }),
-                new iam.PolicyStatement({
-                    sid: 'ECRTokenAccess',
-                    effect: iam.Effect.ALLOW,
-                    actions: ['ecr:GetAuthorizationToken'],
-                    resources: ['*'],
-                }),
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: ['logs:DescribeLogStreams', 'logs:CreateLogGroup'],
-                    resources: [
-                        `arn:aws:logs:${region}:${accountId}:log-group:/aws/bedrock-agentcore/runtimes/*`,
-                    ],
-                }),
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: ['logs:DescribeLogGroups'],
-                    resources: [`arn:aws:logs:${region}:${accountId}:log-group:*`],
-                }),
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-                    resources: [
-                        `arn:aws:logs:${region}:${accountId}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
-                    ],
-                }),
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: [
-                        'xray:PutTraceSegments',
-                        'xray:PutTelemetryRecords',
-                        'xray:GetSamplingRules',
-                        'xray:GetSamplingTargets',
-                    ],
-                    resources: ['*'],
-                }),
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: ['cloudwatch:PutMetricData'],
-                    resources: ['*'],
-                    conditions: {
-                        StringEquals: { 'cloudwatch:namespace': 'bedrock-agentcore' },
-                    },
-                }),
-                new iam.PolicyStatement({
-                    sid: 'BedrockModelInvocation',
-                    effect: iam.Effect.ALLOW,
-                    actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
-                    resources: [
-                        `arn:aws:bedrock:*::foundation-model/*`,
-                        props.inferenceProfileArn,
-                    ],
-                }),
-                new iam.PolicyStatement({
-                    sid: 'StepFunctionsCallback',
-                    effect: iam.Effect.ALLOW,
-                    actions: ['states:SendTaskSuccess', 'states:SendTaskFailure'],
-                    resources: ['*'],
-                }),
-            ],
+            statements: getAgentPolicyStatements({
+                region,
+                accountId,
+                ecrRepositoryArn: dockerImage.repository.repositoryArn,
+                inferenceProfileArn: props.inferenceProfileArn,
+            }),
         });
 
         const runtimeRole = new iam.Role(this, 'AgentCoreRuntimeRole', {
