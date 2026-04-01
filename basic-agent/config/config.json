@@ -1,0 +1,4 @@
+{
+    "inferenceProfile": "us.amazon.nova-2-lite-v1:0",
+    "prefix": "dev"
+}
